@@ -1,0 +1,78 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score, classification_report
+import io
+import requests
+
+# URL for the iris.csv file from a reliable GitHub Gist
+url = "https://gist.githubusercontent.com/netj/8836201/raw/6f9306ad21398ea43cba4f7d537619d0e07d5ae3/iris.csv"
+
+# Download the content of the file
+try:
+    download = requests.get(url).content
+    df = pd.read_csv(io.StringIO(download.decode('utf-8')))
+    print("Dataset loaded successfully.")
+except requests.exceptions.RequestException as e:
+    print(f"Error downloading the dataset: {e}")
+    # Fallback to the built-in dataset if download fails
+    print("Falling back to the built-in scikit-learn Iris dataset.")
+    from sklearn.datasets import load_iris
+    iris = load_iris()
+    X = iris.data
+    y = iris.target
+    target_names = iris.target_names
+    feature_names = iris.feature_names
+else:
+    # If the download was successful, we proceed with the pandas DataFrame
+    # Drop the 'species' column to create the feature set (X)
+    X = df.drop('variety', axis=1)
+    # The 'species' column is the target variable (y)
+    y = df['variety']
+    
+    # We need to encode the species names into numerical labels for the model
+    from sklearn.preprocessing import LabelEncoder
+    le = LabelEncoder()
+    y_encoded = le.fit_transform(y)
+    
+    feature_names = X.columns.tolist()
+    target_names = le.classes_
+
+    X = X.values
+    y = y_encoded
+
+print("Features (first 5 samples):\n", X[:5])
+print("\nTarget labels (first 5 samples):\n", y[:5])
+print("\nSpecies names:", target_names)
+
+# 2. Split the data into training and testing sets
+# We'll use 80% for training and 20% for testing
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+print(f"\nTraining set size: {len(X_train)} samples")
+print(f"Testing set size: {len(X_test)} samples")
+
+# 3. Choose and train a model (K-Nearest Neighbors is a good choice for this dataset)
+# We will use K=3, meaning the model considers the 3 closest neighbors to classify a new point
+knn = KNeighborsClassifier(n_neighbors=3)
+knn.fit(X_train, y_train)
+
+# 4. Make predictions and evaluate the model
+y_pred = knn.predict(X_test)
+
+# Calculate accuracy
+accuracy = accuracy_score(y_test, y_pred)
+print(f"\nModel Accuracy: {accuracy:.2f}")
+
+# A more detailed evaluation using a classification report
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred, target_names=target_names))
+
+# Example of a new prediction
+# Note: The new flower data should have the same number of features as the training data
+new_flower = [[5.1, 3.5, 1.4, 0.2]] # sepal length, sepal width, petal length, petal width
+predicted_species_index = knn.predict(new_flower)
+predicted_species_name = target_names[predicted_species_index[0]]
+
+print("\nPrediction for a new flower with measurements", new_flower)
+print(f"The predicted species is: {predicted_species_name}")
